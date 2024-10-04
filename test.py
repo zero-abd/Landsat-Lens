@@ -23,3 +23,44 @@ subpoint_9 = geocentric_9.subpoint()
 
 print(f"Landsat 8 - Latitude: {subpoint_8.latitude.degrees}, Longitude: {subpoint_8.longitude.degrees}")
 print(f"Landsat 9 - Latitude: {subpoint_9.latitude.degrees}, Longitude: {subpoint_9.longitude.degrees}")
+
+
+
+from osgeo import ogr
+import shapely.wkt
+import shapely.geometry
+
+shapefile = 'landsat_wrs/WRS2_descending.shp'
+wrs = ogr.Open(shapefile)
+layer = wrs.GetLayer(0)
+
+lon = 90.252
+lat = 23.607
+point = shapely.geometry.Point(lon, lat)
+mode = 'D'  # 'D' for descending(day), 'A' for ascending(night)
+
+
+def checkPoint(feature, point, mode):
+    geom = feature.GetGeometryRef() #Get geometry from feature
+    shape = shapely.wkt.loads(geom.ExportToWkt()) #Import geometry into shapely to easily work with our point
+    if point.within(shape) and feature['MODE']==mode:
+        return True
+    else:
+        return False
+
+i=0
+while not checkPoint(layer.GetFeature(i), point, mode):
+    i += 1
+feature = layer.GetFeature(i)
+path = feature['PATH']
+row = feature['ROW']
+print('Path: ', path, 'Row: ', row)
+
+
+
+
+
+username = 'zer0ABD'
+app_token = '***REMOVED***'
+
+
