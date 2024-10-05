@@ -152,7 +152,6 @@ class LandsatDownloader:
         output = response.json()
         if 'errorCode' in output and output['errorCode'] is not None:
             print("Error:", output['errorMessage'])
-            sys.exit()
         return output['data']
     
     def login(self):
