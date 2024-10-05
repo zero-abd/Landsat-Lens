@@ -1,2 +1,81 @@
 config.py
 landsat_data/
+
+# Node.js (for client/)
+node_modules/
+build/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependency directories
+client/node_modules/
+client/.pnp/
+client/.pnp.js
+
+# Build directories
+client/build/
+client/dist/
+
+# Static files
+client/public/static/
+
+# Testing
+client/coverage/
+
+# Misc
+client/.DS_Store
+client/.env
+client/.next
+client/out
+client/.vscode/
+client/.idea/
+client/.cache/
+
+# Flask and Python (for server/)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+*.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+instance/
+.well-known/
+
+# Flask and Python logs and coverage
+server/*.log
+server/*.pot
+server/*.pyc
+server/instance/
+server/htmlcov/
+
+# Virtual environments
+server/.venv/
+server/env/
+server/venv/
+server/.python-version
+Pipfile.lock
+server/.tox/
+server/.coverage
+server/.mypy_cache/
+server/.pytest_cache/
+
+# IDE / Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# MacOS files
+*.DS_Store

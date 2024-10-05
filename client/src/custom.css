@@ -1,0 +1,127 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Poppins", sans-serif;
+    background-color: #ffffff;
+}
+
+#map {
+    height: 85dvh;
+    width: 100%;
+    border-radius: 35px;
+}
+
+#info {
+    font-size: 1em;
+    position: absolute;
+    top: 50px;
+    right: 50px;
+    padding: 20px;
+    width: 300px;
+    /* max-height: 300px; */
+    background: rgba(255, 255, 255, 0.65);
+    outline: 1px solid rgba(210, 207, 207, 0.8);
+    backdrop-filter: blur(20px);
+    overflow-y: auto;
+    border-radius: 20px;
+    z-index: 999;
+    overflow: visible;
+}
+
+.react-datepicker__tab-loop {
+    overflow: visible !important;
+}
+
+.react-datepicker-wrapper {
+    width: 100%;
+}
+
+#satellite-select {
+    font-size: 1em;
+    margin-bottom: 10px;
+    width: 100%;
+    padding: 10px 10px;
+    border: 1px solid #ccc;
+    background: rgba(255, 255, 255, .5);
+    border-radius: 10px;
+    outline: none;
+}
+
+#satellite-info {
+    font-size: 1em;
+    line-height: 1.5em;
+}
+
+.satellite-info-item {
+    display: flex;
+    justify-content: space-between;
+}
+
+.satellite-info-item label {
+    width: 100px;
+    font-weight: bold;
+    color: #7b7e8d;
+}
+
+.leaflet-popup-content-wrapper {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+.leaflet-control-zoom {
+    background-color: #ffffff;
+    border: none;
+    border-radius: 5px;
+}
+
+.leaflet-control-zoom a {
+    color: #333333;
+}
+
+.wrs_label {
+    background: #186dff;
+    color: white;
+    padding: 2px 5px;
+    font-weight: bold;
+    border-radius: 5px;
+}
+
+#auto-focus-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 5px 0 10px 0;
+    cursor: pointer;
+    color: #7b7e8d;
+}
+
+#auto-focus {
+    height: 12px;
+    width: 12px;
+}
+
+.img_overlay {
+    object-fit: fill;
+    transform: rotate(-50deg);
+}
+
+.leaflet-control-zoom {
+    /* padding: 15px !important; */
+    margin: 15px !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 25px !important;
+
+}
+
+.leaflet-control-zoom a {
+    color: #333333;
+    background: rgba(255, 255, 255, 0.65) !important;
+    outline: 1px solid rgba(210, 207, 207, 0.8) !important;
+    margin: 10px;
+    border-radius: 25px !important;
+}
