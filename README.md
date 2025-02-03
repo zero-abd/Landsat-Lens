@@ -1,4 +1,4 @@
-# LANDSET LENS - NASA Space Apps Challenge 2024  (Team Paragon)
+# LANDSAT LENS - NASA Space Apps Challenge 2024  (Team Paragon)
 
 ## Landsat Reflectance Data on the Fly and at Your Fingertips
 
