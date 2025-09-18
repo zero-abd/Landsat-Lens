@@ -1,22 +1,19 @@
-# LANDSAT LENS - NASA Space Apps Challenge 2024  (Team Paragon)
+# LANDSAT LENS
 
 ## Landsat Reflectance Data on the Fly and at Your Fingertips
 
 ### Project Overview
 
-Welcome to Team PARAGON's solution for the 2024 NASA Space Apps Challenge! Our project provides a powerful and user-friendly platform for accessing real-time Landsat satellite data, specifically from Landsat 8 and 9, using an interactive interface that simplifies the process of retrieving, processing, and analyzing satellite imagery.
+This project provides a powerful and user-friendly platform for accessing real-time Landsat satellite data, specifically from Landsat 8 and 9, using an interactive interface that simplifies the process of retrieving, processing, and analyzing satellite imagery.
 
-### You can view our live web application here: [http://teamparagon.earth/](http://teamparagon.earth/)
+### You can view our live web application here: [landsat lens](http://teamparagon.earth/)
 
 ### Presentation and Slides
 
 - **Video Presentation**: [Watch our presentation](https://drive.google.com/file/d/1PSt5gshXWqIrLIkaDd30L6EpWt0PJ_-m/view?usp=drive_link)
 - **Canva Slides**: [View our slides](https://www.canva.com/design/DAGSmiL34aI/MIYgkgIWlCa-DbSFVXXqCw/view?utm_content=DAGSmiL34aI&utm_campaign=designshare&utm_medium=link&utm_source=editor)
 
-### Challenge Overview
-
-- **Chalenge Details**: [2024 NASA Space Apps Challenge - Landsat Reflectance Data: On the Fly and at Your Fingertips](https://www.spaceappschallenge.org/nasa-space-apps-2024/challenges/landsat-reflectance-data-on-the-fly-and-at-your-fingertips/?tab=details)
-
+### Purpose Overview
 Landsat missions have provided the longest continuous dataset of remotely sensed measurements of Earth’s land surface. Comparing ground-based spectral measurements with Landsat Surface Reflectance (SR) data collected at the same time can facilitate experiential learning, encourage scientific exploration with satellite data, foster interdisciplinary and spatial thinking skills, and empower individuals to become informed global citizens. But to compare ground-based measurements with Landsat data, you need to know when Landsat will be passing over a specific land area, and then be able to access the Landsat data collected at that place and time. This specialized and labor-intensive task has yet to be integrated into a single, cohesive application. Your challenge is to develop a web-based application that supports the comparison of ground-based observations with Landsat data by allowing users to define a target location, receive notifications when Landsat is to pass over that location, and then access and display the corresponding Landsat SR data.
 
 Some key difficulties we solve include:
@@ -63,7 +60,7 @@ Our solution bridges these gaps by providing a streamlined, interactive platform
 
 - **USGS M2M API**: Used for fetching Landsat satellite imagery based on user input.
 - **NASA Celestrak**: Provides the Two-Line Element (TLE) data for tracking satellites.
-- **Landsat Track Metadata API**: For fetching metadata on satellite paths.
+- **Landsat Track Metadata API**: For fetching metadata on satellite paths. (This authorization will expire soon. Use this: https://urs.earthdata.nasa.gov to generate a token to use this software)
 - **Firebase**: Used for user authentication and email reminders.
 
 
@@ -145,10 +142,4 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 - Satellite data and video clips used in this project are credited to the **NASA Landsat mission** and their official website.
   
 ---
-
-### Contact
-
-For any questions, issues, or collaboration ideas, feel free to contact us through our GitHub page.
-
-Visit our website: [http://teamparagon.earth/](http://teamparagon.earth/)
 
