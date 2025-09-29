@@ -13,6 +13,8 @@ This project provides a powerful and user-friendly platform for accessing real-t
 - **Video Presentation**: [Watch our presentation](https://drive.google.com/file/d/1PSt5gshXWqIrLIkaDd30L6EpWt0PJ_-m/view?usp=drive_link)
 - **Canva Slides**: [View our slides](https://www.canva.com/design/DAGSmiL34aI/MIYgkgIWlCa-DbSFVXXqCw/view?utm_content=DAGSmiL34aI&utm_campaign=designshare&utm_medium=link&utm_source=editor)
 
+<img width="1803" height="1166" alt="image" src="https://github.com/user-attachments/assets/75676ab4-40b9-4e00-b509-07f79c7b1d0d" />
+
 ### Purpose Overview
 Landsat missions have provided the longest continuous dataset of remotely sensed measurements of Earth’s land surface. Comparing ground-based spectral measurements with Landsat Surface Reflectance (SR) data collected at the same time can facilitate experiential learning, encourage scientific exploration with satellite data, foster interdisciplinary and spatial thinking skills, and empower individuals to become informed global citizens. But to compare ground-based measurements with Landsat data, you need to know when Landsat will be passing over a specific land area, and then be able to access the Landsat data collected at that place and time. This specialized and labor-intensive task has yet to be integrated into a single, cohesive application. Your challenge is to develop a web-based application that supports the comparison of ground-based observations with Landsat data by allowing users to define a target location, receive notifications when Landsat is to pass over that location, and then access and display the corresponding Landsat SR data.
 
