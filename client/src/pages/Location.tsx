@@ -1,415 +1,270 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON, ImageOverlay } from 'react-leaflet';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap, useMapEvents } from 'react-leaflet';
 import * as L from 'leaflet';
-import Swal from 'sweetalert2';
 import 'leaflet/dist/leaflet.css';
-import '../custom.css';
-import IconChecks from '../components/Icon/IconChecks';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../misc/firebase-config';
-import { useAuth } from '../misc/auth-context';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-
-const landsatDataURL = 'http://localhost:5000/get_landsat_data';
-
-const mapServiceURL = 'https://nimbus.cr.usgs.gov/arcgis/rest/services/LLook_Outlines/MapServer/1/';
+import { searchScenes, sceneTileUrl, pixelValues, isoDate, type Scene, type PixelValues } from '../lib/stac';
+import { nextAcquisitions, formatUtcDate } from '../lib/acquisition';
 
 const clickMarkerIcon = L.icon({
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
     shadowSize: [41, 41],
 });
 
-const CustomDateInput = React.forwardRef(({ value, onClick }: any, ref) => (
-    <input className="border border-gray-400 px-2 py-1 w-full outline-none rounded-md" onClick={onClick} value={value} readOnly ref={ref as any} />
-));
+const daysAgo = (n: number) => isoDate(new Date(Date.now() - n * 86_400_000));
+
+const ClickHandler: React.FC<{ onClick: (lat: number, lng: number) => void }> = ({ onClick }) => {
+    useMapEvents({ click: (e) => onClick(e.latlng.lat, L.Util.wrapNum(e.latlng.lng, [-180, 180], true)) });
+    return null;
+};
+
+const FitScene: React.FC<{ scene: Scene | null }> = ({ scene }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (scene) map.fitBounds(L.geoJSON(scene.geometry as any).getBounds(), { padding: [30, 30], maxZoom: 9 });
+    }, [map, scene]);
+    return null;
+};
+
 const Location: React.FC = () => {
-    const [wrsFeatures, setWrsFeatures] = useState<GeoJSON.FeatureCollection | null>(null);
-    const [clickedCoordinate, setClickedCoordinate] = useState<[number, number] | null>(null);
-    const [showLastAqData, setShowLastAqData] = useState<boolean>(false);
-    const [snackbar, setSnackbar] = useState<string | null>(null);
-    const [selectedSceneMode, setSelectedSceneMode] = useState<number>(0);
-    const [currentBlockBounds, setCurrentBlockBounds] = useState<L.LatLngBounds | null>(null);
-    const [cachedNextAquisitionDates, setCachedNextAquisitionDates] = useState<any[]>([]);
-    const [nextAquisitionDates, setNextAquisitionDates] = useState<any[]>([]);
-    const [isAquisitionDateLoading, setIsAquisitionDateLoading] = useState<boolean>(false);
-    const [remindersList, setRemindersList] = useState<any[]>([]);
-    const [startDate, setStartDate] = useState<Date | null>(new Date('2024-09-01')); // Start date
-    const [endDate, setEndDate] = useState<Date | null>(new Date('2024-10-01')); // End date
-    const [cloudCover, setCloudCover] = useState<number>(30); // Cloud cover
-    const [imageUrl, setImageUrl] = useState<string | null>(null); // Image URL after fetching data
+    const [point, setPoint] = useState<[number, number] | null>(null);
+    const [maxCloud, setMaxCloud] = useState<number>(30);
+    const [start, setStart] = useState<string>(daysAgo(365));
+    const [end, setEnd] = useState<string>(daysAgo(0));
+    const [scenes, setScenes] = useState<Scene[]>([]);
+    const [sceneIdx, setSceneIdx] = useState<number>(0);
+    const [searching, setSearching] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pixel, setPixel] = useState<PixelValues | null>(null);
+    const [pixelError, setPixelError] = useState<string | null>(null);
+    const [pixelLoading, setPixelLoading] = useState(false);
+    const [showOnMap, setShowOnMap] = useState(true);
+    const [tileUrl, setTileUrl] = useState<string | null>(null);
+    const searchAbort = useRef<AbortController | null>(null);
 
-    const [isLoading, setIsLoading] = useState(false);
+    const scene = scenes[sceneIdx] ?? null;
 
-    const { currentUser } = useAuth();
-
-    const showSnackbar = (message: string) => {
-        setSnackbar(message);
-        setTimeout(() => {
-            setSnackbar(null);
-        }, 3000);
-    };
-
-    useEffect(() => {
-        (async function () {
-            if (currentUser?.email) {
-                try {
-                    const docRef = doc(db, 'reminders', currentUser?.email as string);
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) {
-                        setRemindersList(docSnap.data()?.all);
-                    }
-                } catch (error) {
-                    console.error('Error fetching reminders:', error);
-                }
-            }
-        })();
-    }, [currentUser]);
-
-    const generateKeyUsingPaths = () => {
-        return wrsFeatures?.features.map((feature) => feature.properties?.PATH).join('-');
-    };
-
-    const isReminderEnabled = () => {
-        const key = generateKeyUsingPaths();
-        return remindersList.find((element) => element.key === key);
-    };
-
-    const fetchLandsatImageData = async () => {
-        if (!startDate || !endDate || !clickedCoordinate) {
-            showSnackbar('Please select start and end dates and a location on the map.');
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            const [lat, lng] = clickedCoordinate;
-            const url = `${landsatDataURL}?start_date=${startDate.toISOString().split('T')[0]}&end_date=${
-                endDate.toISOString().split('T')[0]
-            }&num_scenes=1&cloud_cover=${cloudCover}&latitude=${lat}&longitude=${lng}`;
-            const response = await fetch(url);
-            const imageBlob = await response.blob();
-
-            const imageUrl = URL.createObjectURL(imageBlob);
-            setImageUrl(imageUrl);
-        } catch (error) {
-            console.error('Error fetching Landsat image data:', error);
-            showSnackbar('Error fetching Landsat image data.');
-        } finally {
-            setIsLoading(false);
-            handleShowLastAqStatusChange();
-        }
-    };
-
-    const handleShowLastAqStatusChange = () => {
-        setShowLastAqData((prev) => !prev);
-    };
-
-    const handleNotificationStatusChange = useCallback(async () => {
-        const key = generateKeyUsingPaths();
-        let newList = null;
-        if (isReminderEnabled()) {
-            newList = remindersList.filter((element) => element.key !== key);
-        } else {
-            if (!clickedCoordinate) {
-                showSnackbar('Please select a location first.');
-                return;
-            }
-
-            const [latitude, longitude] = clickedCoordinate;
-
-            newList = [
-                ...remindersList,
-                {
-                    key: key,
-                    dates: nextAquisitionDates,
-                    latitude: latitude,
-                    longitude: longitude,
-                },
-            ];
-        }
-        try {
-            const email = currentUser?.email;
-            const docRef = doc(db, 'reminders', email as string);
-            console.log('Updating reminders:', newList);
-            await setDoc(docRef, { all: newList });
-            setRemindersList(newList);
-            if (!isReminderEnabled()) {
-                Swal.fire({
-                    text: 'You will be reminded 1 day before the next acquisition date.',
-                    icon: 'success',
-                    timer: 10000,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching WRS data:', error);
-            showSnackbar('Error updating reminder');
-        }
-    }, [cachedNextAquisitionDates, currentUser, nextAquisitionDates, remindersList, clickedCoordinate]);
-
-    const handleSceneModeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedSceneMode(parseInt(event.target.value));
-    };
-
-    const styleWRS = (feature: any) => {
-        return {
-            color: feature.properties.MODE === 'D' ? 'blue' : 'green',
-            weight: 2,
-            opacity: 0.65,
-        };
-    };
-
-    useEffect(() => {
-        if (wrsFeatures) {
-            const bounds = L.geoJSON(wrsFeatures).getBounds();
-            setCurrentBlockBounds(bounds);
-        }
-    }, [wrsFeatures]);
-
-    const showFootPrint = useCallback(async (features: any[]) => {
-        try {
-            const geoJsonData: GeoJSON.FeatureCollection = {
-                type: 'FeatureCollection',
-                features: features.map((feature: any) => ({
-                    type: 'Feature',
-                    geometry: feature.geometry,
-                    properties: feature.properties,
-                })),
-            };
-            setWrsFeatures(geoJsonData);
-            setShowLastAqData(false);
-        } catch (error) {
-            console.error('Error processing WRS features:', error);
-            setWrsFeatures(null);
-        }
-    }, []);
-
-    const handleFetchAquisitionDate = useCallback(async (path: number) => {
-        try {
-            console.log('11111');
-            console.log(path);
-            setIsAquisitionDateLoading(true);
-            const response = await fetch(`http://127.0.0.1:5000/next-acq-date?path=${path}`);
-            const data = await response.json();
-            if (data && data.error) {
-                throw new Error(data.error);
-            }
-            setIsAquisitionDateLoading(false);
-            return data;
-        } catch (error) {
-            console.error('Error fetching WRS data:', error);
-            setIsAquisitionDateLoading(false);
-            return null;
-        }
-    }, []);
-
-    const handleMapClick = useCallback(
-        async (e: L.LeafletMouseEvent) => {
-            setWrsFeatures(null);
-            const { lat, lng } = e.latlng;
-            setClickedCoordinate([lat, lng]);
-            setImageUrl(null);
-
-            const url = `${mapServiceURL}query?where=MODE='D'&geometry=${lng},${lat}&geometryType=esriGeometryPoint&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&returnTrueCurves=false&returnIdsOnly=false&returnCountOnly=false&returnZ=false&returnM=false&returnDistinctValues=false&f=geojson`;
-
+    const runSearch = useCallback(
+        async (lat: number, lng: number) => {
+            searchAbort.current?.abort();
+            const ctrl = new AbortController();
+            searchAbort.current = ctrl;
+            setSearching(true);
+            setError(null);
+            setScenes([]);
+            setSceneIdx(0);
+            setPixel(null);
+            setPixelError(null);
             try {
-                const response = await fetch(url);
-                const data = await response.json();
-                console.log('Fetch response:', data);
-
-                if (data.features && data.features.length > 0) {
-                    await showFootPrint(data.features);
-                } else {
-                    console.log('No features found at this location');
-                }
-            } catch (error) {
-                console.error('Error fetching WRS data:', error);
+                const found = await searchScenes({ lat, lng, maxCloud, start, end }, ctrl.signal);
+                setScenes(found);
+                if (!found.length) setError('No Landsat 8/9 scenes match these filters here. Try a higher cloud limit or a wider date range.');
+            } catch (e: any) {
+                if (e.name !== 'AbortError') setError(e.message || 'Scene search failed');
+            } finally {
+                if (!ctrl.signal.aborted) setSearching(false);
             }
         },
-        [showFootPrint]
+        [maxCloud, start, end]
     );
 
-    const MapEvents: React.FC = () => {
-        const map = useMap();
-        useEffect(() => {
-            map.on('click', handleMapClick);
-            return () => {
-                map.off('click', handleMapClick);
-            };
-        }, [map]);
+    const onMapClick = useCallback(
+        (lat: number, lng: number) => {
+            setPoint([lat, lng]);
+            runSearch(lat, lng);
+        },
+        [runSearch]
+    );
 
-        useEffect(() => {
-            if (currentBlockBounds) {
-                map.fitBounds(currentBlockBounds);
-            }
-        }, [map, currentBlockBounds, showLastAqData, selectedSceneMode]);
-
-        useEffect(() => {
-            const mapElement = document.getElementById('map');
-            if (mapElement) {
-                mapElement.style.cursor = 'url(https://maps.gstatic.com/mapfiles/ms2/micons/red-pushpin.png), auto';
-            }
-        }, []);
-
-        useEffect(() => {
-            const mapElement = document.querySelector('.leaflet-control-attribution') as HTMLElement;
-            if (mapElement) {
-                mapElement.style.display = 'none';
-            }
-        }, []);
-
-        return null;
-    };
-
+    // Pixel values and map tiles for the selected scene.
     useEffect(() => {
-        (async function () {
-            setNextAquisitionDates([]);
-            const features = wrsFeatures?.features;
-            if (!features) return;
-            const dates = [];
-            console.log(features);
-            for (let i = 0; i < features.length; i++) {
-                const path = features[i].properties?.PATH;
-                if (path) {
-                    var date = cachedNextAquisitionDates.find((element: any) => String(element.path) === String(path));
-                    if (date) {
-                        console.log('Found');
-                        dates.push(date);
-                    } else {
-                        const d = await handleFetchAquisitionDate(path);
-                        if (d) {
-                            dates.push(d);
-                            setCachedNextAquisitionDates((prev) => [...prev, { path: path, ...d }]);
-                        }
-                    }
-                }
-            }
-            if (dates.length == features.length) {
-                setNextAquisitionDates(dates);
-            }
-        })();
-    }, [wrsFeatures]);
+        if (!scene || !point) return;
+        const ctrl = new AbortController();
+        setPixel(null);
+        setPixelError(null);
+        setPixelLoading(true);
+        setTileUrl(null);
+        pixelValues(scene, point[0], point[1], ctrl.signal)
+            .then(setPixel)
+            .catch((e) => e.name !== 'AbortError' && setPixelError(e.message))
+            .finally(() => !ctrl.signal.aborted && setPixelLoading(false));
+        sceneTileUrl(scene, ctrl.signal)
+            .then(setTileUrl)
+            .catch(() => undefined);
+        return () => ctrl.abort();
+    }, [scene, point]);
 
     return (
-        <div>
-            <div id="info">
-                {wrsFeatures && (
-                    <div>
-                        <div>
-                            <p>Start Date:</p>
-                            <DatePicker
-                                selected={startDate}
-                                onChange={(date: Date | null) => setStartDate(date)}
-                                dateFormat="yyyy-MM-dd"
-                                placeholderText="Select start date"
-                                customInput={<CustomDateInput />}
-                            />
-                        </div>
+        <div className="relative">
+            <div id="info" className="scene-panel">
+                <h2 className="text-lg font-bold mb-1">Landsat scene explorer</h2>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Click anywhere on the map to find the latest Landsat 8/9 surface reflectance scene over that spot.</p>
 
-                        <div className="mt-2">
-                            <p className="mb-1">End Date:</p>
-                            <DatePicker
-                                selected={endDate}
-                                onChange={(date: Date | null) => setEndDate(date)}
-                                dateFormat="yyyy-MM-dd"
-                                placeholderText="Select end date"
-                                customInput={<CustomDateInput />}
-                            />
-                        </div>
-
-                        <div className="mt-2">
-                            <p className="mb-1">Cloud Coverage: {cloudCover}%</p>
-                            <input type="range" min="0" max="100" value={cloudCover} onChange={(e) => setCloudCover(Number(e.target.value))} className="w-full" />
-                        </div>
-
-                        <button
-                            className="bg-slate-100 hover:bg-slate-200 transition-all border-slate-400 shadow-sm border font-bold px-2 py-1 mt-3 rounded-md w-full"
-                            onClick={
-                                showLastAqData
-                                    ? () => {
-                                          handleShowLastAqStatusChange();
-                                      }
-                                    : () => {
-                                          fetchLandsatImageData();
-                                      }
-                            }
-                            disabled={isLoading}
-                        >
-                            {isLoading ? 'Loading...' : showLastAqData ? 'Hide Last Acquisition Data' : 'See Last Acquisition Data'}
-                        </button>
-
-                        <hr className="h-px w-full my-3 bg-slate-600" />
-                        <div className="flex gap-1 flex-col relative">
-                            <span className="font-bold">Next Acquisition Date: </span>
-                            {isAquisitionDateLoading ? (
-                                <span className="size-4 border-2 border-r-slate-100 rounded-full border-slate-600 animate-spin absolute right-1 bottom-1"></span>
-                            ) : (
-                                nextAquisitionDates.length > 0 && (
-                                    <ul className="flex flex-col">
-                                        {...nextAquisitionDates.map((date, i) => {
-                                            return (
-                                                <li key={i} className="flex flex-col">
-                                                    <div>
-                                                        <span className="font-bold">Landsat 8: </span>
-                                                        {date.landsat_8}
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold">Landsat 9: </span>
-                                                        {date.landsat_9}
-                                                    </div>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                )
-                            )}
-                        </div>
-                        {nextAquisitionDates.length > 0 && (
-                            <button
-                                className="bg-slate-100 hover:bg-slate-200 transition-all border-slate-400 shadow-sm border font-bold px-2 py-1 mt-3 rounded-md w-full"
-                                onClick={() => handleNotificationStatusChange()}
-                            >
-                                {isReminderEnabled() ? 'Turn off reminder' : 'Remind Me'}
-                            </button>
-                        )}
-                    </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                    <label className="flex flex-col gap-1">
+                        From
+                        <input type="date" className="form-input py-1 px-2 text-xs" value={start} max={end} onChange={(e) => setStart(e.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        To
+                        <input type="date" className="form-input py-1 px-2 text-xs" value={end} min={start} max={daysAgo(0)} onChange={(e) => setEnd(e.target.value)} />
+                    </label>
+                </div>
+                <label className="block text-xs mt-2">
+                    Max cloud cover: {maxCloud}%
+                    <input type="range" min={0} max={100} value={maxCloud} onChange={(e) => setMaxCloud(Number(e.target.value))} className="w-full" />
+                </label>
+                {point && (
+                    <button className="scene-btn mt-1" onClick={() => runSearch(point[0], point[1])} disabled={searching}>
+                        {searching ? 'Searching…' : 'Search again with these filters'}
+                    </button>
                 )}
 
-                {!wrsFeatures && <p>Select a location on the map</p>}
+                {!point && <p className="mt-3 font-semibold">Select a location on the map.</p>}
+                {searching && <p className="mt-3">Searching the Planetary Computer catalog…</p>}
+                {error && <p className="mt-3 text-danger">{error}</p>}
+
+                {scene && (
+                    <div className="mt-3 space-y-3">
+                        <div>
+                            <label className="text-xs font-semibold">Scene ({scenes.length} found, newest first)</label>
+                            <select id="satellite-select" className="!mb-0" style={{ fontSize: '0.8em', padding: '6px 8px' }} value={sceneIdx} onChange={(e) => setSceneIdx(Number(e.target.value))}>
+                                {scenes.map((s, i) => (
+                                    <option key={s.id} value={i}>
+                                        {s.datetime.slice(0, 10)} · {s.platform.replace('landsat-', 'Landsat ')} · {s.cloudCover.toFixed(0)}% cloud
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="text-xs space-y-0.5">
+                            <div className="satellite-info-item">
+                                <label>Acquired</label>
+                                <span>{new Date(scene.datetime).toISOString().slice(0, 16).replace('T', ' ')} UTC</span>
+                            </div>
+                            <div className="satellite-info-item">
+                                <label>WRS-2</label>
+                                <span>
+                                    Path {scene.wrsPath} / Row {scene.wrsRow}
+                                </span>
+                            </div>
+                            <div className="satellite-info-item">
+                                <label>Scene ID</label>
+                                <span className="truncate" title={scene.id}>
+                                    {scene.id}
+                                </span>
+                            </div>
+                        </div>
+
+                        {scene.previewUrl && (
+                            <a href={scene.previewUrl} target="_blank" rel="noreferrer" title="Open the full-size true-color preview">
+                                <img src={`${scene.previewUrl}&max_size=360`} alt={`True-color preview of ${scene.id}`} className="w-full max-h-48 object-contain rounded-lg" loading="lazy" />
+                            </a>
+                        )}
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input type="checkbox" checked={showOnMap} onChange={(e) => setShowOnMap(e.target.checked)} />
+                            Overlay the scene on the map
+                        </label>
+
+                        <div>
+                            <h3 className="font-semibold text-sm mb-1">Surface reflectance at your point</h3>
+                            {pixelLoading && <p className="text-xs">Reading pixel values…</p>}
+                            {pixelError && <p className="text-xs text-danger">{pixelError}</p>}
+                            {pixel && <Spectrum pixel={pixel} />}
+                        </div>
+
+                        <div>
+                            <h3 className="font-semibold text-sm mb-1">Next predicted passes over path {scene.wrsPath}</h3>
+                            <table className="w-full text-xs">
+                                <tbody>
+                                    {(['landsat_8', 'landsat_9'] as const).map((sat) => (
+                                        <tr key={sat}>
+                                            <td className="font-semibold pr-2 align-top">{sat === 'landsat_8' ? 'Landsat 8' : 'Landsat 9'}</td>
+                                            <td>
+                                                {nextAcquisitions(sat, scene.wrsPath, 2)
+                                                    .map(formatUtcDate)
+                                                    .join(' · ')}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <p className="text-[10px] text-gray-500 mt-1">From the USGS 16-day acquisition cycle (UTC dates, daytime passes).</p>
+                        </div>
+                    </div>
+                )}
+                <p className="text-[10px] text-gray-500 mt-3">
+                    Data: USGS Landsat Collection 2 Level-2 via the{' '}
+                    <a className="underline" href="https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2" target="_blank" rel="noreferrer">
+                        Microsoft Planetary Computer
+                    </a>
+                    .
+                </p>
             </div>
-            <MapContainer id="map" center={[23.685, 90.3563]} zoom={3} minZoom={2} maxZoom={10} className="h-screen">
-                <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
-                <TileLayer url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}" />
-                {!showLastAqData && wrsFeatures && <GeoJSON data={wrsFeatures} style={styleWRS} />}
-                {clickedCoordinate && (
-                    <Marker position={clickedCoordinate} icon={clickMarkerIcon}>
+
+            <MapContainer id="map" center={[23.685, 90.3563]} zoom={4} minZoom={2} maxZoom={13} worldCopyJump>
+                <TileLayer
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                    attribution="Basemap &copy; Esri, Maxar, Earthstar Geographics · Landsat: USGS/NASA via Microsoft Planetary Computer"
+                />
+                {scene && showOnMap && tileUrl && (
+                    <TileLayer key={scene.id} url={tileUrl} bounds={L.latLngBounds([scene.bbox[1], scene.bbox[0]], [scene.bbox[3], scene.bbox[2]])} opacity={0.95} zIndex={5} />
+                )}
+                <TileLayer url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}" zIndex={10} />
+                {scene && <GeoJSON key={scene.id} data={scene.geometry as any} style={{ color: '#22d3ee', weight: 2, fillOpacity: 0 }} interactive={false} />}
+                {point && (
+                    <Marker position={point} icon={clickMarkerIcon}>
                         <Popup>
-                            Clicked Location
-                            <br />
-                            Lat: {clickedCoordinate[0].toFixed(4)}
-                            <br />
-                            Lon: {clickedCoordinate[1].toFixed(4)}
+                            {point[0].toFixed(4)}, {point[1].toFixed(4)}
                         </Popup>
                     </Marker>
                 )}
-                {showLastAqData && currentBlockBounds && <ImageOverlay url={imageUrl || ''} bounds={currentBlockBounds} className="img_overlay" />}
-                <MapEvents />
+                <ClickHandler onClick={onMapClick} />
+                <FitScene scene={scene} />
             </MapContainer>
-            {snackbar && (
-                <div className="absolute bottom-6 right-6 rounded-md px-4 py-2 z-[99999] bg-black text-white">
-                    <IconChecks className="w-6 h-6 inline-block mr-2" />
-                    {snackbar}
-                </div>
-            )}
         </div>
     );
 };
+
+const Spectrum: React.FC<{ pixel: PixelValues }> = ({ pixel }) => {
+    const max = Math.max(0.5, ...pixel.reflectance.map((r) => r.value));
+    return (
+        <div className="text-xs">
+            <div className="flex items-end gap-1 h-24 border-b border-gray-300 pb-px">
+                {pixel.reflectance.map((r) => (
+                    <div key={r.band} className="flex-1 flex flex-col items-center justify-end h-full" title={`${r.label} (${r.band}, ${r.nm} nm): ${r.value.toFixed(4)}`}>
+                        <span className="text-[9px] mb-0.5">{r.value.toFixed(2)}</span>
+                        <div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(0, (r.value / max) * 100)}%` }} />
+                    </div>
+                ))}
+            </div>
+            <div className="flex gap-1 mt-0.5">
+                {pixel.reflectance.map((r) => (
+                    <span key={r.band} className="flex-1 text-center text-[9px] leading-tight">
+                        {r.band}
+                        <br />
+                        {r.label}
+                    </span>
+                ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1 mt-2 text-center">
+                <Stat label="NDVI" value={pixel.ndvi?.toFixed(3) ?? 'n/a'} />
+                <Stat label="NDWI" value={pixel.ndwi?.toFixed(3) ?? 'n/a'} />
+                <Stat label="Surface temp" value={pixel.surfaceTempC !== null ? `${pixel.surfaceTempC.toFixed(1)} °C` : 'n/a'} />
+            </div>
+            {pixel.qa.length > 0 && <p className="mt-1 text-[10px] text-gray-500">QA flags: {pixel.qa.join(', ')}</p>}
+        </div>
+    );
+};
+
+const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <div className="rounded-md bg-white-light/60 dark:bg-dark/60 p-1">
+        <div className="text-[9px] text-gray-500">{label}</div>
+        <div className="font-semibold">{value}</div>
+    </div>
+);
 
 export default Location;

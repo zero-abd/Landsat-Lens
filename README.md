@@ -1,12 +1,13 @@
 # LANDSAT LENS
 
+**Live demo: https://landsat-lens.vercel.app**
+
 ## Landsat Reflectance Data on the Fly and at Your Fingertips
 
 ### Project Overview
 
 This project provides a powerful and user-friendly platform for accessing real-time Landsat satellite data, specifically from Landsat 8 and 9, using an interactive interface that simplifies the process of retrieving, processing, and analyzing satellite imagery.
 
-### You can view our live web application here: [landsat lens](http://teamparagon.earth/)
 
 ### Presentation and Slides
 
@@ -28,87 +29,45 @@ Our solution bridges these gaps by providing a streamlined, interactive platform
 
 ### Key Features
 
-- **Real-Time Satellite Tracking**: Visualize the paths and positions of Landsat 8 and 9 satellites in real-time on an interactive map.
-  
-- **Next Acquisition Date Calculation**: Easily calculate the next acquisition date for a specific location for both Landsat 8 and Landsat 9 satellites.
+- **Real-time satellite tracking**: live positions and one-orbit ground tracks of Landsat 8 and 9, computed in the browser with SGP4 ([satellite.js](https://github.com/shashwatak/satellite-js)) from Celestrak TLEs.
+- **Scene explorer**: click any point on the map to find the latest Landsat 8/9 Collection 2 Level-2 scenes over it, filtered by date range and cloud cover. Shows the scene footprint, a true-color preview, and the scene itself as a map overlay.
+- **Real surface reflectance**: per-band surface reflectance (B1 to B7) at the clicked pixel, plus NDVI, NDWI, surface temperature (B10) and the QA pixel flags, read from the actual Landsat COGs.
+- **Next acquisition dates**: the next predicted Landsat 8 and Landsat 9 passes over the scene's WRS-2 path, from the USGS 16-day acquisition cycle.
+- **Ground data guide**: how to collect ground-based spectral measurements to compare against Landsat SR.
 
-- **Landsat Reflectance Data**: Access real Landsat data for specific geographical coordinates (latitude/longitude) and view it as an image overlay on the map.
+No sign-in and no API keys are needed.
 
-- **Interactive Map**: Use Leaflet and ESRI Leaflet to interactively explore geographical data, track satellites, and view data overlays.
+### How it works
 
-- **Filter Controls**: Use controls like cloud percentage filters, date range selection, and more to refine the Landsat data results.
-
-- **Email Reminder Feature**: Set reminders to receive email notifications when the next satellite pass is approaching your location.
+| Piece | Source |
+|---|---|
+| Orbital elements | [Celestrak](https://celestrak.org) GP data, fetched through `client/api/tle.ts` (a Vercel function limited to the two Landsat catalog numbers, cached at the edge for 2 hours as Celestrak asks) |
+| Positions and ground tracks | `client/src/lib/orbit.ts`, SGP4 in the browser |
+| Scenes, previews, map tiles, pixel values | [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2) STAC and data APIs (`landsat-c2-l2`), public and keyless; `client/src/lib/stac.ts` |
+| Reflectance scaling | USGS Collection 2 Level-2 factors: SR = DN x 0.0000275 - 0.2, ST(K) = DN x 0.00341802 + 149 |
+| Next acquisition | Per-path phase of the 16-day cycle derived from the USGS acquisition calendar; `client/src/lib/acquisition.ts` |
 
 ### Technologies Used
 
-#### Frontend
+- **React + TypeScript + Vite**, **Tailwind CSS**, **Redux Toolkit** (theme state)
+- **Leaflet / react-leaflet** with Esri World Imagery basemaps
+- **satellite.js** (SGP4)
+- **Vercel** static hosting plus one serverless function
 
-- **React**: Modern JavaScript library for building user interfaces.
-- **Leaflet**: JavaScript library for interactive maps.
-- **ESRI Leaflet**: Extends Leaflet with ArcGIS services and data.
-- **TypeScript**: A typed superset of JavaScript for type safety.
-- **Tailwind CSS**: A utility-first CSS framework for styling.
-- **Firebase**: Used for authentication and email reminders.
+### Run locally
 
-#### Backend
+```bash
+cd client
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # type-check and production build
+```
 
-- **Python (Flask)**: Lightweight web framework for serving the backend.
-- **Skyfield**: Library for satellite position calculations based on TLE data.
-- **USGS Machine-to-Machine (M2M) API**: Used for searching and retrieving Landsat satellite data.
-- **NASA Celestrak TLE API**: To retrieve up-to-date Two-Line Element (TLE) data for satellite tracking.
+Locally the app falls back to fetching TLEs straight from Celestrak (it sends CORS headers). `vercel dev` also serves `/api/tle`.
 
-#### APIs & Services
+### History
 
-- **USGS M2M API**: Used for fetching Landsat satellite imagery based on user input.
-- **NASA Celestrak**: Provides the Two-Line Element (TLE) data for tracking satellites.
-- **Landsat Track Metadata API**: For fetching metadata on satellite paths. (This authorization will expire soon. Use this: https://urs.earthdata.nasa.gov to generate a token to use this software)
-- **Firebase**: Used for user authentication and email reminders.
-
-
-### User Features
-
-#### Satellite Tracking
-- Track the real-time positions of **Landsat 8** and **Landsat 9** on an interactive map.
-- Click on any location to see the next acquisition date for that location.
-
-#### Next Acquisition Date
-- The application uses satellite orbit data and acquisition cycles to calculate the next time a satellite will pass over a specific location.
-  
-#### Viewing Landsat Data
-- View reflectance data for any selected location.
-- Use filter controls like cloud percentage and date range selection to refine results.
-- Satellite images are shown as overlays on the map to analyze geographical changes.
-
-#### Set Email Reminders
-- Users can enable notifications for specific locations to be reminded via email before the next satellite pass.
-
----
-
-### API Endpoints
-
-#### `/satellite-data` (GET)
-
-- **Description**: Retrieves real-time position data for Landsat 8 and 9 satellites.
-- **Response**: JSON with details like latitude, longitude, altitude, and speed.
-
-#### `/next-acq-date` (GET)
-
-- **Parameters**:
-  - `path` (Required): The satellite path for which to retrieve the next acquisition date.
-  
-- **Response**: The next acquisition date and time for both Landsat 8 and Landsat 9.
-
-#### `/get_landsat_data` (GET)
-
-- **Parameters**:
-  - `start_date`: Start date for fetching satellite images (default is 2024-09-01).
-  - `end_date`: End date for fetching satellite images (default is today's date).
-  - `latitude`: Latitude of the location of interest.
-  - `longitude`: Longitude of the location of interest.
-  - `cloud_cover`: Maximum cloud cover allowed (percentage).
-  
-- **Response**: Returns the Landsat image as a PNG file, processed for reflectance.
+The NASA Space Apps 2024 build used a Flask server (Skyfield, the USGS M2M API with a personal token), Google sign-in with Firebase, and Firestore email reminders that never had a sender. The hosted version replaces those with the keyless, browser-side pipeline above so anyone can open it without an account.
 
 ---
 
@@ -116,7 +75,7 @@ Our solution bridges these gaps by providing a streamlined, interactive platform
 
 - **Ground-Based Measurements Integration**: We plan to streamline ground-based spectral measurements from [soilspectroscopy.org](https://soilspectroscopy.org) into the web application, allowing for more detailed comparative analysis with Landsat data.
 
-- **Enhanced Analytics**: In future iterations, we aim to include in-depth analytics, such as vegetation index and surface temperature analysis using Landsat data.
+- **Overpass reminders**: email or calendar reminders before the next Landsat pass over a saved location.
 
 ---
 

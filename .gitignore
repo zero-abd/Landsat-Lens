@@ -79,3 +79,5 @@ server/.pytest_cache/
 
 # MacOS files
 *.DS_Store
+.vercel
+.env*

@@ -77,7 +77,7 @@ const Sidebar = () => {
                     <div className="flex justify-between items-center px-4 py-3">
                         <NavLink to="/" className="main-logo flex items-center shrink-0">
                             <img className="w-8 ml-[5px] flex-none" src="/assets/images/logo.svg" alt="logo" />
-                            <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5 font-semibold align-middle lg:inline dark:text-white-light">Paragon</span>
+                            <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5 font-semibold align-middle lg:inline dark:text-white-light">Landsat Lens</span>
                         </NavLink>
 
                         <button
@@ -93,7 +93,7 @@ const Sidebar = () => {
                             {routes.map(
                                 (item) =>
                                     item.path !== '/login' && (
-                                        <li className="nav-item">
+                                        <li className="nav-item" key={item.path}>
                                             <NavLink to={item.path} className="group">
                                                 <div className="flex items-center">
                                                     <Icon icon={item.icon} className="text-2xl mr-2" />
