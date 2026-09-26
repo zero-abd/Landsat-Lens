@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '../../misc/auth-context';
 import { IRootState } from '../../store';
 import { toggleTheme, toggleSidebar } from '../../store/themeConfigSlice';
-import Dropdown from '../Dropdown';
 import { Icon } from '@iconify/react';
 
 const Header = () => {
     const location = useLocation();
-    const { currentUser } = useAuth();
     useEffect(() => {
         const selector = document.querySelector('ul.horizontal-menu a[href="' + window.location.pathname + '"]');
         if (selector) {
@@ -31,8 +28,6 @@ const Header = () => {
         }
     }, [location]);
 
-    const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl' ? true : false;
-
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
     const dispatch = useDispatch();
 
@@ -52,7 +47,7 @@ const Header = () => {
                         </button>
                         <Link to="/" className="main-logo flex items-center shrink-0">
                             <img className="w-8 ltr:-ml-1 rtl:-mr-1 inline" src="/assets/images/logo.svg" alt="logo" />
-                            <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5  font-semibold  align-middle hidden md:inline dark:text-white-light transition-all duration-300">Paragon</span>
+                            <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5  font-semibold  align-middle hidden md:inline dark:text-white-light transition-all duration-300">Landsat Lens</span>
                         </Link>
                     </div>
 
@@ -100,37 +95,15 @@ const Header = () => {
                                 </button>
                             )}
                         </div>
-                        <div className="dropdown shrink-0 flex">
-                            <Dropdown
-                                offset={[0, 8]}
-                                placement={`${isRtl ? 'bottom-start' : 'bottom-end'}`}
-                                btnClassName="relative group block"
-                                button={<img className="w-9 h-9 rounded-full object-cover" src={currentUser?.photoURL || 'https://avatar.iran.liara.run/public/boy'} alt="userProfile" />}
-                            >
-                                <ul className="text-dark dark:text-white-dark !py-0 w-[300px] font-semibold dark:text-white-light/90">
-                                    <li>
-                                        <div className="flex items-center px-4 py-4 w-400">
-                                            <img className="rounded-md w-10 h-10 object-cover" src={currentUser?.photoURL || 'https://avatar.iran.liara.run/public/boy'} alt="userProfile" />
-                                            <div className="ltr:pl-4 rtl:pr-4 truncate">
-                                                <h4 className="text-base">
-                                                    {currentUser?.displayName}
-                                                    <span className="text-xs bg-success-light rounded text-success px-1 ltr:ml-2 rtl:ml-2">Pro</span>
-                                                </h4>
-                                                <button type="button" className="text-black/60 hover:text-primary dark:text-dark-light/60 dark:hover:text-white">
-                                                    {currentUser?.email}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li className="border-t border-white-light dark:border-white-light/10">
-                                        <Link to="/logout" className="text-danger !py-3">
-                                            <Icon icon="mdi:logout" className="w-5 h-5 ltr:mr-2 rtl:ml-2" />
-                                            Sign Out
-                                        </Link>
-                                    </li>
-                                </ul>
-                            </Dropdown>
-                        </div>
+                        <a
+                            href="https://github.com/zero-abd/Landsat-Lens"
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Source on GitHub"
+                            className="flex items-center p-2 rounded-full bg-white-light/40 dark:bg-dark/40 hover:text-primary hover:bg-white-light/90 dark:hover:bg-dark/60"
+                        >
+                            <Icon icon="mdi:github" className="w-5 h-5" />
+                        </a>
                     </div>
                 </div>
             </div>

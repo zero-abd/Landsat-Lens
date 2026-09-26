@@ -18,8 +18,8 @@ body {
 #info {
     font-size: 1em;
     position: absolute;
-    top: 50px;
-    right: 50px;
+    top: 30px;
+    right: 30px;
     padding: 20px;
     width: 300px;
     /* max-height: 300px; */
@@ -29,16 +29,54 @@ body {
     overflow-y: auto;
     border-radius: 20px;
     z-index: 999;
-    overflow: visible;
+    max-height: calc(85dvh - 60px);
 }
 
-.react-datepicker__tab-loop {
-    overflow: visible !important;
+.dark #info {
+    background: rgba(14, 23, 38, 0.8);
+    outline-color: rgba(59, 63, 92, 0.8);
+    color: #e0e6ed;
 }
 
-.react-datepicker-wrapper {
+.dark #satellite-select {
+    background: rgba(14, 23, 38, 0.6);
+    color: #e0e6ed;
+    border-color: #3b3f5c;
+}
+
+.scene-btn {
     width: 100%;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid #94a3b8;
+    background: rgba(241, 245, 249, 0.8);
+    color: #0e1726;
 }
+
+.scene-btn:disabled {
+    opacity: 0.6;
+}
+
+.leaflet-container {
+    cursor: crosshair;
+}
+
+@media (max-width: 767px) {
+    #info {
+        position: static;
+        width: 100%;
+        max-height: none;
+        margin-bottom: 12px;
+    }
+
+    #map {
+        height: 70dvh;
+        border-radius: 20px;
+    }
+}
+
 
 #satellite-select {
     font-size: 1em;
@@ -61,7 +99,13 @@ body {
     justify-content: space-between;
 }
 
-.satellite-info-item label {
+#info label {
+    color: inherit;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+#info .satellite-info-item label {
     width: 100px;
     font-weight: bold;
     color: #7b7e8d;
@@ -104,10 +148,6 @@ body {
     width: 12px;
 }
 
-.img_overlay {
-    object-fit: fill;
-    transform: rotate(-50deg);
-}
 
 .leaflet-control-zoom {
     /* padding: 15px !important; */
